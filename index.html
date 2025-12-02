@@ -6,8 +6,8 @@
   <title>Invitation — Interactive</title>
   <style>
     :root{
-      --card-w:650px;
-      --card-h:1280px;
+      --card-w:360px;
+      --card-h:720px;
       --shadow: 0 20px 40px rgba(0,0,0,0.18);
       --accent: #111;
     }
@@ -31,10 +31,9 @@
       width:100%;height:100%;position:relative;transform-style:preserve-3d;
     }
 
-    /* COVER (like the front flap) */
     .cover{
       position:absolute;inset:0;border-radius:16px;overflow:hidden;z-index:30;
-      transform-origin:left center; /* hinge on left edge */
+      transform-origin:left center;
       transition: transform 700ms cubic-bezier(.2,.95,.25,1), box-shadow 300ms;
       box-shadow: var(--shadow);
       cursor:pointer;
@@ -43,53 +42,133 @@
     }
     .cover img{width:100%;height:100%;object-fit:cover;display:block}
 
-    /* The inner content which will be flipped to show back side */
     .inner{
-      position:absolute;inset:0;border-radius:16px;overflow:hidden;z-index:10;
-      transform-style:preserve-3d;transition: transform 700ms cubic-bezier(.2,.95,.25,1);
-      box-shadow: 0 8px 20px rgba(0,0,0,0.09);
+      position:absolute;inset:0;border-radius:16px;overflow:visible;z-index:10;
+      transform-style:preserve-3d;
+      transition: transform 700ms cubic-bezier(.2,.95,.25,1);
     }
 
-    .face{position:absolute;inset:0;backface-visibility:hidden;display:flex;align-items:center;justify-content:center;overflow:hidden}
+    .face{
+      position:absolute;
+      inset:0;
+      backface-visibility:hidden;
+      -webkit-backface-visibility:hidden;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+      border-radius:16px;
+      background:#fff;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.09);
+    }
     .face img{width:100%;height:100%;object-fit:cover;display:block}
 
-    .face.back{transform:rotateY(180deg)}
+    /* Front face - visible by default */
+    .face.front {
+      transform: rotateY(0deg);
+    }
 
-    /* when inner-flipped show the back */
-    .inner.is-flipped{transform:rotateY(180deg)}
+    /* Back face - MUST be pre-rotated 180deg */
+    .face.back {
+      transform: rotateY(180deg);
+    }
 
-    /* After opening, lift the card slightly */
     .card.opened{transform:translateY(-6px)}
 
-    /* cover-open state (hinge) */
     .cover.is-open{
       transform: rotateY(-130deg) translateX(-18%);
       box-shadow: 0 30px 60px rgba(0,0,0,0.22);
     }
 
-    /* small helper for a soft reveal of inner content while cover opens */
-    .inner.revealed{filter:brightness(1);}
-
-    /* button */
     .controls{display:flex;gap:10px;align-items:center}
     .btn{background:var(--accent);color:#fff;border:none;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600}
     .btn.ghost{background:transparent;color:var(--accent);border:1px solid rgba(0,0,0,0.08)}
 
-    /* responsive */
+    /* Confetti & Decorations */
+    .confetti-container{
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      z-index:1000;
+      overflow:hidden;
+    }
+
+    .confetti{
+      position:absolute;
+      width:10px;
+      height:10px;
+      opacity:0;
+      animation: confetti-fall 3s ease-out forwards;
+    }
+
+    @keyframes confetti-fall{
+      0%{
+        transform:translateY(0) rotate(0deg);
+        opacity:1;
+      }
+      100%{
+        transform:translateY(100vh) rotate(720deg);
+        opacity:0;
+      }
+    }
+
+    .sparkle{
+      position:absolute;
+      font-size:24px;
+      opacity:0;
+      animation: sparkle-burst 2s ease-out forwards;
+    }
+
+    @keyframes sparkle-burst{
+      0%{
+        transform:translate(0,0) scale(0);
+        opacity:1;
+      }
+      50%{
+        opacity:1;
+      }
+      100%{
+        transform:translate(var(--tx), var(--ty)) scale(1);
+        opacity:0;
+      }
+    }
+
+    .heart{
+      position:absolute;
+      font-size:20px;
+      opacity:0;
+      animation: heart-float 3s ease-out forwards;
+    }
+
+    @keyframes heart-float{
+      0%{
+        transform:translateY(0) rotate(0deg) scale(0);
+        opacity:1;
+      }
+      50%{
+        opacity:1;
+        transform:translateY(-30vh) rotate(15deg) scale(1);
+      }
+      100%{
+        transform:translateY(-60vh) rotate(-15deg) scale(0.8);
+        opacity:0;
+      }
+    }
+
     @media (max-width:420px){:root{--card-w:300px;--card-h:480px}}
   </style>
 </head>
 <body>
+  <div class="confetti-container" id="confettiContainer"></div>
+  
   <div class="stage">
     <div class="card-wrapper">
       <div class="card" id="card">
 
-        <!-- COVER (front) -->
         <div class="cover" id="cover" role="button" aria-label="Open invitation">
           <img src="cover.png" alt="Invitation cover" />
         </div>
 
-        <!-- INNER content with two faces -->
         <div class="inner" id="inner">
           <div class="face front">
             <img src="content.jpeg" alt="Invitation inside" />
@@ -103,7 +182,7 @@
     </div>
 
     <div class="controls">
-      <button class="btn" id="turnBtn" aria-pressed="false" style="display:none">Turn</button>
+      <button class="btn" id="turnBtn" aria-pressed="false" style="display:none">Turn Over</button>
       <button class="btn ghost" id="resetBtn" style="display:none">Reset</button>
     </div>
   </div>
@@ -114,50 +193,152 @@
     const card = document.getElementById('card');
     const turnBtn = document.getElementById('turnBtn');
     const resetBtn = document.getElementById('resetBtn');
+    const confettiContainer = document.getElementById('confettiContainer');
 
     let opened = false;
     let flipped = false;
 
-    // NEW OPEN ANIMATION (hinge-like): when the cover is clicked it swings open from left
-    cover.addEventListener('click', (e)=>{
-      if (opened) return; // only open once
-      opened = true;
+    // Confetti colors
+    const confettiColors = ['#ff6b9d', '#c44569', '#ffa502', '#f39c12', '#3498db', '#9b59b6', '#1abc9c', '#2ecc71'];
+    const sparkleEmojis = ['✨', '⭐', '💫', '🌟', '✦'];
+    const heartEmojis = ['💖', '💝', '💗', '💕', '💓'];
 
-      // add visual states
+    function createConfetti() {
+      const confettiCount = 50;
+      
+      for (let i = 0; i < confettiCount; i++) {
+        setTimeout(() => {
+          const confetti = document.createElement('div');
+          confetti.className = 'confetti';
+          confetti.style.left = Math.random() * 100 + '%';
+          confetti.style.top = '-20px';
+          confetti.style.backgroundColor = confettiColors[Math.floor(Math.random() * confettiColors.length)];
+          confetti.style.animationDelay = Math.random() * 0.5 + 's';
+          confetti.style.animationDuration = (Math.random() * 2 + 2) + 's';
+          
+          // Random shapes
+          const shape = Math.random();
+          if (shape < 0.33) {
+            confetti.style.borderRadius = '50%';
+          } else if (shape < 0.66) {
+            confetti.style.width = '15px';
+            confetti.style.height = '5px';
+          }
+          
+          confettiContainer.appendChild(confetti);
+          
+          setTimeout(() => confetti.remove(), 3500);
+        }, i * 20);
+      }
+    }
+
+    function createSparkles() {
+      const sparkleCount = 15;
+      const centerX = window.innerWidth / 2;
+      const centerY = window.innerHeight / 2;
+      
+      for (let i = 0; i < sparkleCount; i++) {
+        setTimeout(() => {
+          const sparkle = document.createElement('div');
+          sparkle.className = 'sparkle';
+          sparkle.textContent = sparkleEmojis[Math.floor(Math.random() * sparkleEmojis.length)];
+          sparkle.style.left = centerX + 'px';
+          sparkle.style.top = centerY + 'px';
+          
+          const angle = (Math.PI * 2 * i) / sparkleCount;
+          const distance = 150 + Math.random() * 100;
+          const tx = Math.cos(angle) * distance;
+          const ty = Math.sin(angle) * distance;
+          
+          sparkle.style.setProperty('--tx', tx + 'px');
+          sparkle.style.setProperty('--ty', ty + 'px');
+          sparkle.style.animationDelay = Math.random() * 0.2 + 's';
+          
+          confettiContainer.appendChild(sparkle);
+          
+          setTimeout(() => sparkle.remove(), 2500);
+        }, i * 50);
+      }
+    }
+
+    function createHearts() {
+      const heartCount = 10;
+      
+      for (let i = 0; i < heartCount; i++) {
+        setTimeout(() => {
+          const heart = document.createElement('div');
+          heart.className = 'heart';
+          heart.textContent = heartEmojis[Math.floor(Math.random() * heartEmojis.length)];
+          heart.style.left = (20 + Math.random() * 60) + '%';
+          heart.style.top = '100%';
+          heart.style.animationDelay = Math.random() * 0.5 + 's';
+          heart.style.animationDuration = (Math.random() * 1 + 2.5) + 's';
+          
+          confettiContainer.appendChild(heart);
+          
+          setTimeout(() => heart.remove(), 3500);
+        }, i * 100);
+      }
+    }
+
+    function triggerCelebration() {
+      createConfetti();
+      createSparkles();
+      createHearts();
+    }
+
+    cover.addEventListener('click', ()=>{
+      if (opened) return;
+      opened = true;
       cover.classList.add('is-open');
       card.classList.add('opened');
-
-      // small delay so the cover starts swinging, then reveal inner fully
+      
+      // Trigger celebration!
+      setTimeout(() => {
+        triggerCelebration();
+      }, 400);
+      
       setTimeout(()=>{
-        inner.classList.add('revealed');
         turnBtn.style.display = 'inline-block';
         resetBtn.style.display = 'inline-block';
       }, 220);
     });
 
-    // TURN: flip inner to show back face
-    turnBtn.addEventListener('click', ()=>{
+    turnBtn.addEventListener('click', () => {
       flipped = !flipped;
-      inner.classList.toggle('is-flipped', flipped);
+      
+      // Apply the rotation to show front or back
+      if (flipped) {
+        inner.style.transform = 'rotateY(180deg)';
+        turnBtn.textContent = 'Turn Back';
+      } else {
+        inner.style.transform = 'rotateY(0deg)';
+        turnBtn.textContent = 'Turn Over';
+      }
+      
       turnBtn.setAttribute('aria-pressed', String(flipped));
-      turnBtn.textContent = flipped ? 'Turn Back' : 'Turn';
     });
 
-    // RESET: bring everything back to initial state
     resetBtn.addEventListener('click', ()=>{
-      opened = false; flipped = false;
+      opened = false;
+      flipped = false;
       cover.classList.remove('is-open');
-      inner.classList.remove('is-flipped','revealed');
       card.classList.remove('opened');
+      inner.style.transform = 'rotateY(0deg)';
       turnBtn.style.display = 'none';
       resetBtn.style.display = 'none';
       turnBtn.setAttribute('aria-pressed', 'false');
-      turnBtn.textContent = 'Turn';
+      turnBtn.textContent = 'Turn Over';
+      
+      // Clear any remaining decorations
+      confettiContainer.innerHTML = '';
     });
 
-    // keyboard accessibility: Enter or Space to open when cover focused
     cover.addEventListener('keydown', (ev)=>{
-      if(ev.key === 'Enter' || ev.key === ' ') cover.click();
+      if(ev.key === 'Enter' || ev.key === ' ') {
+        ev.preventDefault();
+        cover.click();
+      }
     });
   </script>
 </body>
