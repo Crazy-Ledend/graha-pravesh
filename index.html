@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Invitation — Interactive</title>
+  <style>
+    :root{
+      --card-w:360px;
+      --card-h:520px;
+      --shadow: 0 20px 40px rgba(0,0,0,0.18);
+      --accent: #111;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-family:Inter,system-ui,Arial;
+      background: linear-gradient(180deg,#f6f6f8 0%, #efeef3 100%);
+      -webkit-font-smoothing:antialiased;
+    }
+
+    .stage{display:flex;flex-direction:column;gap:16px;align-items:center}
+
+    .card-wrapper{width:var(--card-w);height:var(--card-h);perspective:2200px}
+
+    .card{
+      width:100%;height:100%;position:relative;transform-style:preserve-3d;
+    }
+
+    /* COVER (like the front flap) */
+    .cover{
+      position:absolute;inset:0;border-radius:16px;overflow:hidden;z-index:30;
+      transform-origin:left center; /* hinge on left edge */
+      transition: transform 700ms cubic-bezier(.2,.95,.25,1), box-shadow 300ms;
+      box-shadow: var(--shadow);
+      cursor:pointer;
+      background:#fff;
+      display:flex;align-items:center;justify-content:center;
+    }
+    .cover img{width:100%;height:100%;object-fit:cover;display:block}
+
+    /* The inner content which will be flipped to show back side */
+    .inner{
+      position:absolute;inset:0;border-radius:16px;overflow:hidden;z-index:10;
+      transform-style:preserve-3d;transition: transform 700ms cubic-bezier(.2,.95,.25,1);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.09);
+    }
+
+    .face{position:absolute;inset:0;backface-visibility:hidden;display:flex;align-items:center;justify-content:center;overflow:hidden}
+    .face img{width:100%;height:100%;object-fit:cover;display:block}
+
+    .face.back{transform:rotateY(180deg)}
+
+    /* when inner-flipped show the back */
+    .inner.is-flipped{transform:rotateY(180deg)}
+
+    /* After opening, lift the card slightly */
+    .card.opened{transform:translateY(-6px)}
+
+    /* cover-open state (hinge) */
+    .cover.is-open{
+      transform: rotateY(-130deg) translateX(-18%);
+      box-shadow: 0 30px 60px rgba(0,0,0,0.22);
+    }
+
+    /* small helper for a soft reveal of inner content while cover opens */
+    .inner.revealed{filter:brightness(1);}
+
+    /* button */
+    .controls{display:flex;gap:10px;align-items:center}
+    .btn{background:var(--accent);color:#fff;border:none;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600}
+    .btn.ghost{background:transparent;color:var(--accent);border:1px solid rgba(0,0,0,0.08)}
+
+    /* responsive */
+    @media (max-width:420px){:root{--card-w:300px;--card-h:480px}}
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <div class="card-wrapper">
+      <div class="card" id="card">
+
+        <!-- COVER (front) -->
+        <div class="cover" id="cover" role="button" aria-label="Open invitation">
+          <img src="cover.png" alt="Invitation cover" />
+        </div>
+
+        <!-- INNER content with two faces -->
+        <div class="inner" id="inner">
+          <div class="face front">
+            <img src="content.jpg" alt="Invitation inside" />
+          </div>
+          <div class="face back">
+            <img src="back.jpg" alt="Invitation back side" />
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn" id="turnBtn" aria-pressed="false" style="display:none">Turn</button>
+      <button class="btn ghost" id="resetBtn" style="display:none">Reset</button>
+    </div>
+  </div>
+
+  <script>
+    const cover = document.getElementById('cover');
+    const inner = document.getElementById('inner');
+    const card = document.getElementById('card');
+    const turnBtn = document.getElementById('turnBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    let opened = false;
+    let flipped = false;
+
+    // NEW OPEN ANIMATION (hinge-like): when the cover is clicked it swings open from left
+    cover.addEventListener('click', (e)=>{
+      if (opened) return; // only open once
+      opened = true;
+
+      // add visual states
+      cover.classList.add('is-open');
+      card.classList.add('opened');
+
+      // small delay so the cover starts swinging, then reveal inner fully
+      setTimeout(()=>{
+        inner.classList.add('revealed');
+        turnBtn.style.display = 'inline-block';
+        resetBtn.style.display = 'inline-block';
+      }, 220);
+    });
+
+    // TURN: flip inner to show back face
+    turnBtn.addEventListener('click', ()=>{
+      flipped = !flipped;
+      inner.classList.toggle('is-flipped', flipped);
+      turnBtn.setAttribute('aria-pressed', String(flipped));
+      turnBtn.textContent = flipped ? 'Turn Back' : 'Turn';
+    });
+
+    // RESET: bring everything back to initial state
+    resetBtn.addEventListener('click', ()=>{
+      opened = false; flipped = false;
+      cover.classList.remove('is-open');
+      inner.classList.remove('is-flipped','revealed');
+      card.classList.remove('opened');
+      turnBtn.style.display = 'none';
+      resetBtn.style.display = 'none';
+      turnBtn.setAttribute('aria-pressed', 'false');
+      turnBtn.textContent = 'Turn';
+    });
+
+    // keyboard accessibility: Enter or Space to open when cover focused
+    cover.addEventListener('keydown', (ev)=>{
+      if(ev.key === 'Enter' || ev.key === ' ') cover.click();
+    });
+  </script>
+</body>
+</html>
